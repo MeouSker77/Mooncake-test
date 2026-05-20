@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing v* tag to build and publish, for example v1.2.3'
+        required: true
+        type: string
 
 env:
   SCCACHE_GHA_ENABLED: "true"
@@ -22,6 +28,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref_name }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -115,6 +123,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref_name }}
 
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
@@ -135,4 +145,5 @@ jobs:
       - name: Upload wheels to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
           files: mooncake-wheel/dist-release/*.whl
