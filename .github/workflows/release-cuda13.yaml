@@ -4,9 +4,13 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release tag name, for example v1.2.3; build source always comes from main'
+        required: true
+        type: string
 
-env:
-  SCCACHE_GHA_ENABLED: "true"
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -14,7 +18,7 @@ jobs:
       contents: write
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.12']
     env:
       BUILD_WITH_EP: "1"
       CU13_BUILD: "1"
@@ -22,6 +26,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -45,34 +51,20 @@ jobs:
           sub-packages: '["nvcc", "nvrtc-dev"]'
           non-cuda-sub-packages: '["libcusparse-dev", "libcublas-dev", "libcusolver-dev"]'
 
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Configure sccache
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Run sccache stat for check
-        shell: bash
-        run: ${SCCACHE_PATH} --show-stats
-
       - name: Configure project
         run: |
           sudo apt update -y
           sudo bash -x dependencies.sh -y
           mkdir build
           cd build
-          cmake .. -DBUILD_UNIT_TESTS=OFF -DUSE_HTTP=ON -DUSE_ETCD=ON -DUSE_CUDA=ON -DWITH_EP=ON -DEP_TORCH_VERSIONS="2.9.1;2.10.0;2.11.0;2.12.0" -DSTORE_USE_ETCD=ON -DENABLE_SCCACHE=ON -DCMAKE_BUILD_TYPE=Release
+          cmake .. -DBUILD_UNIT_TESTS=OFF -DUSE_HTTP=ON -DUSE_ETCD=ON -DUSE_CUDA=ON -DWITH_EP=ON -DEP_TORCH_VERSIONS="2.11.0" -DSTORE_USE_ETCD=ON -DENABLE_SCCACHE=OFF -DCMAKE_BUILD_TYPE=Release
         shell: bash
 
       - name: Build project
         run: |
           export LIBRARY_PATH=/usr/local/cuda/lib64/stubs:$LIBRARY_PATH
           cd build
-          make -j
+          make -j2
           sudo make install
         shell: bash
 
@@ -115,6 +107,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
@@ -135,11 +129,6 @@ jobs:
       - name: Upload wheels to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: main
           files: mooncake-wheel/dist-release/*.whl
-
-      - name: Publish package to PyPI
-        if: github.repository == 'kvcache-ai/Mooncake'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: mooncake-wheel/dist-release/
-          password: ${{ secrets.PYPI_CU13_API_TOKEN }}
