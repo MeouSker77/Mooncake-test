@@ -14,7 +14,7 @@ jobs:
       contents: write
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.12']
     env:
       BUILD_WITH_EP: "1"
       CU13_BUILD: "1"
@@ -136,10 +136,3 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: mooncake-wheel/dist-release/*.whl
-
-      - name: Publish package to PyPI
-        if: github.repository == 'kvcache-ai/Mooncake'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: mooncake-wheel/dist-release/
-          password: ${{ secrets.PYPI_CU13_API_TOKEN }}
