@@ -1298,6 +1298,14 @@ std::string MasterMetricManager::serialize_metrics() {
     serialize_metric(soft_pin_key_count_);
     serialize_metric(active_clients_);
 
+    // Serialize cache statistics used by calculate_cache_stats().
+    serialize_metric(mem_cache_hit_nums_);
+    serialize_metric(file_cache_hit_nums_);
+    serialize_metric(mem_cache_nums_);
+    serialize_metric(file_cache_nums_);
+    serialize_metric(valid_get_nums_);
+    serialize_metric(total_get_nums_);
+
     // Serialize Histogram
     serialize_metric(value_size_distribution_);
 
