@@ -4,11 +4,17 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release tag name, for example v1.2.3; build source always comes from main'
+        required: true
+        type: string
 
 jobs:
   # Skip semver pre-release tags (e.g. v1.0.0-rc1); those are handled by pre-release.yaml.
   build:
-    if: ${{ !contains(github.ref_name, '-') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.ref_name, '-') }}
     uses: ./.github/workflows/_build-wheel.yaml
     with:
       runner: ubuntu-22.04
@@ -18,13 +24,15 @@ jobs:
       torch-cuda-arch-list: '8.0;9.0'
       ep-torch-versions: '2.11.0;2.12.0;2.12.1'
       build-nvlink-allocator: true
+      source-ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || '' }}
+      release-version: ${{ inputs.release_tag || github.ref_name }}
       cmake-args: >-
         -DBUILD_UNIT_TESTS=OFF -DUSE_HTTP=ON -DUSE_ETCD=ON -DUSE_CUDA=ON
         -DWITH_EP=ON -DSTORE_USE_ETCD=ON -DENABLE_SCCACHE=ON -DCMAKE_BUILD_TYPE=Release
       artifact-prefix: mooncake-wheel
 
   build-arm64:
-    if: ${{ !contains(github.ref_name, '-') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.ref_name, '-') }}
     uses: ./.github/workflows/_build-wheel.yaml
     with:
       runner: ubuntu-22.04-arm
@@ -32,6 +40,8 @@ jobs:
       cuda: container
       cmake-generator: Ninja
       torch-cuda-arch-list: '9.0'
+      source-ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || '' }}
+      release-version: ${{ inputs.release_tag || github.ref_name }}
       cmake-args: >-
         -DBUILD_UNIT_TESTS=OFF -DUSE_HTTP=ON -DUSE_CUDA=ON -DUSE_MNNVL=ON -DWITH_EP=OFF
         -DWITH_STORE_RUST=OFF -DENABLE_SCCACHE=ON -DCMAKE_BUILD_TYPE=Release
@@ -45,5 +55,7 @@ jobs:
     uses: ./.github/workflows/_publish-wheel.yaml
     with:
       artifact-pattern: 'mooncake-wheel*'
+      release-tag: ${{ inputs.release_tag || github.ref_name }}
+      target-commitish: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.sha }}
     secrets:
       pypi-token: ${{ secrets.PYPI_API_TOKEN }}
